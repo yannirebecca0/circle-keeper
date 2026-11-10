@@ -189,6 +189,11 @@ async function handle(req, res) {
       return send(res, 200, { ...result, circle: C.organizerView(s) });
     }
 
+    if (method === 'GET' && action === 'progress') {
+      // Polled by the UI while a check-in runs, so the organizer can watch the agent work.
+      return send(res, 200, { ...agent.getProgress(s.id), circle: C.organizerView(s) });
+    }
+
     if (method === 'POST' && action === 'payout') {
       await C.payout(s, 'organizer');
       return send(res, 200, C.organizerView(s));

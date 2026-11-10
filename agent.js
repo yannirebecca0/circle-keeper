@@ -154,11 +154,36 @@ async function fallbackRun(s) {
   return `AI is off, so a simple rule-based check-in ran: ${did.length ? did.join('; ') : 'nothing needed attention'}.`;
 }
 
+// Plain-language label for each tool call, shown live in the UI while the agent works.
+function describe(s, name, args, result, error) {
+  const who = (id) => C.memberById(s, id)?.name || id;
+  if (error) {
+    const label = { send_reminder: `Skipped reminding ${who(args.member_id)}`, propose_position_swap: 'Skipped a swap', request_payout: 'Payout not requested yet' }[name] || `Could not run ${name}`;
+    return { text: `${label}: ${error}`, ok: false };
+  }
+  switch (name) {
+    case 'get_circle_status': return { text: 'Read the circle: who has paid, who is late, and the notes', ok: true };
+    case 'sync_paypal_payments': {
+      const found = (result.changes || []).filter((c) => c !== 'No new payments found.');
+      return { text: found.length ? `Checked PayPal: ${found.join('; ')}` : 'Checked PayPal for new payments: none found', ok: true };
+    }
+    case 'send_reminder': return { text: `Sent ${who(args.member_id)} a reminder`, ok: true };
+    case 'propose_position_swap': return { text: `Suggested swapping ${who(args.member_a)} and ${who(args.member_b)} (needs your approval)`, ok: true };
+    case 'request_payout': return { text: 'Asked you to approve the payout', ok: true };
+    case 'check_payout_status': return { text: result.message ? 'Checked payouts: none yet' : `Checked payout status with PayPal: ${result.item_status || result.batch_status}`, ok: true };
+    default: return { text: `Ran ${name}`, ok: true };
+  }
+}
+
 const running = new Set();
+const progress = new Map(); // circle id -> { running, steps: [{ text, ok }] }
+const getProgress = (id) => progress.get(id) || { running: false, steps: [] };
 
 async function runCheckIn(s, instruction) {
   if (running.has(s.id)) C.fail(409, 'The coordinator is already working on this circle.');
   running.add(s.id);
+  const live = { running: true, steps: [] };
+  progress.set(s.id, live);
   const mark = s.activity.at(-1); // activity is capped, so remember the last entry rather than an index
   try {
     let summary;
@@ -179,7 +204,14 @@ async function runCheckIn(s, instruction) {
           execute: async (name, args) => {
             const t = byName[name];
             if (!t) throw new Error(`Unknown tool ${name}`);
-            return t.run(args);
+            try {
+              const result = await t.run(args);
+              live.steps.push(describe(s, name, args, result));
+              return result;
+            } catch (e) {
+              live.steps.push(describe(s, name, args, null, e.message));
+              throw e;
+            }
           },
         });
         summary = out.text || 'Check-in complete.';
@@ -189,10 +221,11 @@ async function runCheckIn(s, instruction) {
     }
     C.log(s, 'agent', summary);
     require('./store').save();
-    return { summary, actions: s.activity.slice(mark ? s.activity.lastIndexOf(mark) + 1 : 0) };
+    return { summary, steps: live.steps, actions: s.activity.slice(mark ? s.activity.lastIndexOf(mark) + 1 : 0) };
   } finally {
+    live.running = false;
     running.delete(s.id);
   }
 }
 
-module.exports = { runCheckIn };
+module.exports = { runCheckIn, getProgress };

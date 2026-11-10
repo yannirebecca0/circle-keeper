@@ -73,7 +73,10 @@
   .big { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
   .spin { display:inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: s .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
   @keyframes s { to { transform: rotate(360deg); } }
-</style>
+  .live { list-style: none; margin: 12px 0 0; padding: 10px 12px; background:#faf5ff; border:1px solid #e9d5ff; border-radius: 12px; font-size: 14px; }
+  .live li { padding: 3px 0; display:flex; gap: 8px; }
+  .live .mark { color: var(--ok); font-weight: 700; flex: none; width: 14px; }
+  .live li.skip { color: var(--muted); } .live li.skip .mark { color: var(--muted); }</style>
 </head>
 <body>
 <main>
@@ -95,6 +98,7 @@ let STATUS = {};
 let V = null;          // current circle view
 let busy = null;       // name of the action in progress
 let lastSummary = null;
+let liveSteps = [];    // what the coordinator has done so far in the current/last check-in
 
 // ---------- local list of circles this browser has opened ----------
 const SAVED = 'circle-keeper.circles';
@@ -284,7 +288,8 @@ function organizer() {
         <label for="instr">Anything the coordinator should know? (optional)</label>
         <textarea id="instr" rows="2" placeholder="e.g. Tomas told me he gets paid on Friday" maxlength="500">${esc($('#instr')?.value || '')}</textarea>
         <div class="actions" style="margin-top:8px"><button class="gold" data-act="checkin" ${dis()}>${spin('checkin', 'Run AI check-in')}</button></div>
-        ${lastSummary ? `<div class="note"><strong>Coordinator:</strong> ${esc(lastSummary)}</div>` : ''}
+        ${busy === 'checkin' || liveSteps.length ? `<ul class="live">${liveSteps.map((st) => `<li class="${st.ok ? '' : 'skip'}"><span class="mark">${st.ok ? '✓' : '–'}</span>${esc(st.text)}</li>`).join('')}${busy === 'checkin' ? `<li class="muted"><span class="spin"></span>${liveSteps.length ? 'Working…' : 'Reading the circle…'}</li>` : ''}</ul>` : ''}
+        ${lastSummary && busy !== 'checkin' ? `<div class="note"><strong>Coordinator:</strong> ${esc(lastSummary)}</div>` : ''}
         ${proposals}
       </div>`}
       ${done ? proposals : ''}
@@ -373,10 +378,27 @@ document.addEventListener('click', (e) => {
     case 'sync': return act('sync', async () => { V = await circleApi('sync', {}); toast('Checked with PayPal'); });
     case 'checkin': return act('checkin', async () => {
       const instruction = $('#instr')?.value || '';
-      const r = await circleApi('checkin', { instruction });
-      V = r.circle;
-      lastSummary = r.summary;
-      if ($('#instr')) $('#instr').value = '';
+      liveSteps = [];
+      lastSummary = null;
+      // Watch the agent work: poll its progress (and the circle) while the check-in runs.
+      const poll = setInterval(async () => {
+        try {
+          const p = await circleApi('progress');
+          if (busy !== 'checkin') return;
+          liveSteps = p.steps;
+          V = p.circle;
+          render();
+        } catch {}
+      }, 1200);
+      try {
+        const r = await circleApi('checkin', { instruction });
+        V = r.circle;
+        liveSteps = r.steps || [];
+        lastSummary = r.summary;
+        if ($('#instr')) $('#instr').value = '';
+      } finally {
+        clearInterval(poll);
+      }
     });
     case 'copy': return copy(memberLink(b.dataset.token));
   }
