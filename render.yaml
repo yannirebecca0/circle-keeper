@@ -1,0 +1,27 @@
+# Render Blueprint: deploys Circle Keeper as a web service.
+# In the Render dashboard: New > Blueprint, pick this repo, then fill in the secret values.
+services:
+  - type: web
+    name: circle-keeper
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/status
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DEMO_EMAILS
+        sync: false
+      - key: AI_LIMIT_PER_HOUR
+        value: "40"

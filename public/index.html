@@ -3,63 +3,120 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
 <title>Circle Keeper</title>
 <style>
-  :root { --bg:#fbf7f2; --ink:#2a2230; --muted:#7b7183; --card:#fff; --accent:#7c3aed; --gold:#f5b301; --ok:#16a34a; --bad:#dc2626; --line:#eadfd3; }
+  :root { --bg:#fbf7f2; --ink:#2a2230; --muted:#7b7183; --card:#fff; --accent:#7c3aed; --accent-soft:#f1ecf7; --gold:#f5b301; --ok:#16a34a; --bad:#dc2626; --line:#eadfd3; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
-  h1 { margin: 0; font-size: 28px; letter-spacing: -0.5px; }
-  .sub { color: var(--muted); margin: 4px 0 20px; }
-  .badges { display:flex; gap:8px; margin-bottom: 16px; flex-wrap: wrap; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 72px; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom: 18px; }
+  header a { color: inherit; text-decoration: none; }
+  h1 { margin: 0; font-size: 26px; letter-spacing: -0.5px; }
+  h2 { margin: 0 0 8px; font-size: 20px; }
+  h3 { margin: 0 0 10px; font-size: 16px; }
+  .sub { color: var(--muted); margin: 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: 14px; }
+  .badges { display:flex; gap:6px; flex-wrap: wrap; }
   .badge { font-size: 12px; padding: 3px 10px; border-radius: 99px; background:#efe7f8; color:#5b21b6; }
   .badge.off { background:#fde8e8; color:#991b1b; }
-  .grid { display:grid; grid-template-columns: 340px 1fr; gap: 20px; }
-  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
-  .card { background:var(--card); border:1px solid var(--line); border-radius: 16px; padding: 18px; }
-  .ring { width: 100%; height: auto; }
+  .grid { display:grid; grid-template-columns: 320px 1fr; gap: 18px; align-items: start; }
+  .stack { display:grid; gap: 18px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius: 16px; padding: 18px; min-width: 0; }
+  .ring { width: 100%; height: auto; display:block; }
   button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; padding: 8px 14px; background: var(--accent); color: #fff; font-weight: 600; }
-  button.ghost { background: #f1ecf7; color: #4c1d95; }
+  button.ghost { background: var(--accent-soft); color: #4c1d95; }
   button.gold { background: var(--gold); color: #3b2a00; }
+  button.ok { background: var(--ok); }
+  button.sm { padding: 5px 10px; font-size: 13px; }
   button:disabled { opacity: .45; cursor: not-allowed; }
+  input, textarea, select { font: inherit; padding: 8px 10px; border:1px solid var(--line); border-radius: 10px; background:#fff; color: var(--ink); width: 100%; }
+  textarea { resize: vertical; min-height: 44px; }
+  label { font-size: 13px; color: var(--muted); display:block; margin-bottom: 4px; }
   .row { display:flex; align-items:center; gap:10px; padding: 10px 0; border-top: 1px solid var(--line); }
   .row:first-child { border-top: 0; }
   .pos { width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color:#fff; display:grid; place-items:center; font-size: 13px; flex: none; }
+  .pos.done { background: var(--ok); }
   .who { flex: 1; min-width: 0; }
   .who small { color: var(--muted); display:block; }
-  .tag { font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 700; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 700; white-space: nowrap; }
   .low { background:#dcfce7; color:#166534; } .medium { background:#fef3c7; color:#92400e; } .high { background:#fee2e2; color:#991b1b; }
-  .paid { color: var(--ok); font-weight: 700; font-size: 14px; }
-  .actions { display:flex; gap:8px; flex-wrap: wrap; margin-bottom: 14px; }
-  .note { background:#faf5ff; border:1px solid #e9d5ff; border-radius: 12px; padding: 12px 14px; margin: 12px 0; font-size: 15px; }
-  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color:#fff; padding: 10px 18px; border-radius: 12px; max-width: 90vw; }
+  .tag.recv { background:#fef3c7; color:#92400e; } .tag.got { background:#e0f2fe; color:#075985; } .tag.pend { background:#fef9c3; color:#854d0e; }
+  .paid { color: var(--ok); font-weight: 700; font-size: 14px; white-space: nowrap; }
+  .actions { display:flex; gap:8px; flex-wrap: wrap; align-items:center; }
+  .note { background:#faf5ff; border:1px solid #e9d5ff; border-radius: 12px; padding: 12px 14px; margin: 10px 0 0; font-size: 15px; }
+  .approve { background:#fffbeb; border:1px solid #fde68a; border-radius: 12px; padding: 12px 14px; margin-top: 10px; }
+  .feed { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow:auto; }
+  .feed li { display:flex; gap:10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .feed li:first-child { border-top: 0; }
+  .who-dot { flex:none; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; height: fit-content; text-transform: uppercase; letter-spacing: .3px; }
+  .a-agent { background:#ede9fe; color:#5b21b6; } .a-paypal { background:#dbeafe; color:#1e40af; } .a-organizer { background:#fef3c7; color:#92400e; } .a-system { background:#f3f4f6; color:#4b5563; }
+  .msg { border:1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 8px; font-size: 15px; }
+  .msg small { color: var(--muted); display:block; margin-bottom: 2px; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color:#fff; padding: 10px 18px; border-radius: 12px; max-width: 90vw; z-index: 10; }
   .toast.bad { background: var(--bad); }
-  .empty { text-align:center; padding: 56px 16px; }
-  .empty p { color: var(--muted); max-width: 460px; margin: 8px auto 20px; }
-  input[type=number] { width: 54px; padding: 6px; border:1px solid var(--line); border-radius: 8px; font: inherit; }
+  .hero { padding: 28px 0 8px; }
+  .hero h2 { font-size: 30px; letter-spacing: -0.6px; max-width: 680px; line-height: 1.2; }
+  .hero p { max-width: 640px; color: var(--muted); }
+  .steps { display:grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 18px 0 24px; }
+  @media (max-width: 720px) { .steps { grid-template-columns: 1fr; } }
+  .step { background: var(--card); border:1px solid var(--line); border-radius: 14px; padding: 14px; font-size: 15px; }
+  .step b { display:block; margin-bottom: 2px; }
+  .mrow { display:grid; grid-template-columns: 1fr 1.3fr 1.6fr auto; gap: 8px; margin-bottom: 8px; }
+  @media (max-width: 720px) { .mrow { grid-template-columns: 1fr; padding-bottom: 8px; border-bottom: 1px solid var(--line); } }
+  .two { display:grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  @media (max-width: 720px) { .two { grid-template-columns: 1fr; } }
+  .link { color: var(--accent); cursor: pointer; background: none; padding: 0; font-weight: 600; }
+  .clock { display:flex; gap:8px; align-items:center; flex-wrap: wrap; font-size: 14px; }
+  .big { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+  .spin { display:inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: s .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes s { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
 <main>
-  <h1>Circle Keeper</h1>
-  <p class="sub">An AI coordinator for lending circles. Everyone pays in, one person receives the pot, every round.</p>
-  <div class="badges" id="badges"></div>
+  <header>
+    <a href="/"><h1>Circle Keeper</h1><p class="sub">An AI coordinator for lending circles, powered by PayPal.</p></a>
+    <div class="badges" id="badges"></div>
+  </header>
   <div id="app"></div>
 </main>
 <div id="toast" class="toast" style="display:none"></div>
 
 <script>
 const $ = (s) => document.querySelector(s);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
-let S = null;
-let nudgeText = null;
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const params = new URLSearchParams(location.search);
+const CID = params.get('c');
+const KEY = params.get('key');
+let STATUS = {};
+let V = null;          // current circle view
+let busy = null;       // name of the action in progress
+let lastSummary = null;
 
+// ---------- local list of circles this browser has opened ----------
+const SAVED = 'circle-keeper.circles';
+function saved() { try { return JSON.parse(localStorage.getItem(SAVED)) || []; } catch { return []; } }
+function remember(entry) {
+  try {
+    const list = saved().filter((x) => !(x.id === entry.id && x.key === entry.key));
+    list.unshift({ ...entry, at: Date.now() });
+    localStorage.setItem(SAVED, JSON.stringify(list.slice(0, 12)));
+  } catch {}
+}
+
+// ---------- api ----------
 async function api(path, body) {
-  const res = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const data = await res.json();
+  const headers = { 'Content-Type': 'application/json' };
+  if (KEY) headers['X-Circle-Key'] = KEY;
+  const res = await fetch(path, body === undefined ? { headers } : { method: 'POST', headers, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
 }
+const circleApi = (action, body) => api(`/api/c/${encodeURIComponent(CID)}${action ? '/' + action : ''}`, body);
 
 function toast(msg, bad) {
   const t = $('#toast');
@@ -67,35 +124,86 @@ function toast(msg, bad) {
   t.className = 'toast' + (bad ? ' bad' : '');
   t.style.display = 'block';
   clearTimeout(toast.t);
-  toast.t = setTimeout(() => (t.style.display = 'none'), 4500);
+  toast.t = setTimeout(() => (t.style.display = 'none'), 5000);
 }
 
-async function run(fn) {
+async function act(name, fn) {
+  if (busy) return;
+  busy = name; render();
   try { await fn(); } catch (e) { toast(e.message, true); }
+  busy = null; render();
+}
+const spin = (name, label) => (busy === name ? `<span class="spin"></span>${label}` : label);
+const dis = () => (busy ? 'disabled' : '');
+
+// ---------- badges ----------
+function renderBadges() {
+  const b = (on, text) => `<span class="badge ${on ? '' : 'off'}">${esc(text)}</span>`;
+  $('#badges').innerHTML =
+    b(STATUS.paypalConfigured, `PayPal sandbox: ${STATUS.paypalConfigured ? 'connected' : 'not configured'}`) +
+    b(STATUS.webhooks, `Webhooks: ${STATUS.webhooks ? 'on' : 'off'}`) +
+    b(STATUS.aiEnabled, `AI coordinator: ${STATUS.aiEnabled ? 'on' : 'off'}`);
 }
 
-async function refresh() { S = await api('/api/circle'); render(); }
+// ---------- landing ----------
+let form = { name: 'Our circle', amount: 20, dueAfterDays: 3, members: [{}, {}, {}] };
 
-const seed = () => run(async () => { S = await api('/api/demo', {}); nudgeText = null; render(); toast('Demo circle loaded'); });
-const planAI = () => run(async () => { toast('The coordinator is thinking...'); S = await api('/api/circle/plan', {}); render(); const failed = /^AI planning (failed|is off)/.test(S.circle.rationale || ''); toast(failed ? S.circle.rationale : 'Rotation planned', failed); });
-const pay = (id) => run(async () => { const d = await api('/api/circle/pay', { memberId: id }); location.href = d.approveUrl; });
-const payout = () => run(async () => { S = await api('/api/circle/payout', {}); render(); toast('Payout sent through PayPal'); });
-const nudge = (id) => run(async () => {
-  const daysLate = Number($('#days').value) || 3;
-  const name = S.circle.members.find((m) => m.id === id).name;
-  const d = await api('/api/circle/nudge', { memberId: id, daysLate });
-  nudgeText = { name, text: d.text };
-  render();
-});
+function landing() {
+  const list = saved();
+  const memberRows = form.members.map((m, i) => `
+    <div class="mrow">
+      <input data-m="${i}" data-f="name" placeholder="Name" value="${esc(m.name)}" maxlength="40" aria-label="Member ${i + 1} name">
+      <input data-m="${i}" data-f="email" placeholder="PayPal email (sandbox)" value="${esc(m.email)}" type="email" aria-label="Member ${i + 1} PayPal email">
+      <input data-m="${i}" data-f="note" placeholder="Situation (optional): steady job, new member, money tight..." value="${esc(m.note)}" maxlength="300" aria-label="Member ${i + 1} notes">
+      <button class="ghost sm" data-act="rm" data-i="${i}" ${form.members.length <= 3 ? 'disabled' : ''} aria-label="Remove member">Remove</button>
+    </div>`).join('');
+  return `
+  <section class="hero">
+    <h2>A coordinator for tandas, susus and chit funds that never forgets a date and never plays favorites.</h2>
+    <p>In a lending circle, everyone pays in each round and one person takes home the whole pot. Most circles run on group chats, spreadsheets and one tired organizer. Circle Keeper's AI does the coordinating, PayPal moves the money, and the organizer approves every payout.</p>
+  </section>
+  <div class="steps">
+    <div class="step"><b>1. The AI plans the order</b>It reads each member's situation and decides who receives when, so the circle stays safe and fair.</div>
+    <div class="step"><b>2. Members pay with PayPal</b>Each member gets a private link with a PayPal button. Payments are tracked per round.</div>
+    <div class="step"><b>3. The coordinator runs each round</b>It checks payments with PayPal, sends reminders in the right tone, and asks you to approve the payout.</div>
+  </div>
+  <div class="grid">
+    <div class="stack">
+      <div class="card">
+        <h3>See it in action</h3>
+        <p class="muted small" style="margin-top:0">A five-person circle, USD 20 each, with a mix of situations for the AI to work with.</p>
+        <button data-act="demo" ${dis()}>${spin('demo', 'Load demo circle')}</button>
+      </div>
+      ${list.length ? `<div class="card"><h3>Your circles</h3>${list.map((x) => `<div class="row"><div class="who"><strong>${esc(x.name)}</strong><small>${x.role === 'member' ? 'Member link' : 'Organizer'}</small></div><a class="link" href="/?c=${encodeURIComponent(x.id)}&key=${encodeURIComponent(x.key)}">Open</a></div>`).join('')}</div>` : ''}
+    </div>
+    <div class="card">
+      <h3>Start your own circle</h3>
+      <div class="two">
+        <div><label for="f-name">Circle name</label><input id="f-name" data-f="name" value="${esc(form.name)}" maxlength="60"></div>
+        <div><label for="f-amount">Each pays (USD)</label><input id="f-amount" data-f="amount" type="number" min="1" max="1000" value="${esc(form.amount)}"></div>
+        <div><label for="f-due">Due after (days)</label><input id="f-due" data-f="dueAfterDays" type="number" min="1" max="14" value="${esc(form.dueAfterDays)}"></div>
+      </div>
+      <label>Members (3 to 12). Payouts go to each member's PayPal email.</label>
+      ${memberRows}
+      <div class="actions" style="margin-top:6px">
+        <button class="ghost" data-act="add" ${form.members.length >= 12 ? 'disabled' : ''}>Add member</button>
+        <button data-act="create" ${dis()}>${spin('create', 'Create circle')}</button>
+      </div>
+    </div>
+  </div>`;
+}
 
-function ring(c) {
-  const n = c.members.length, cx = 160, cy = 160, R = 120;
-  let s = `<svg viewBox="0 0 320 320" class="ring"><circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#eadfd3" stroke-width="2" stroke-dasharray="4 6"/>`;
-  c.members.forEach((m, i) => {
+// ---------- circle ring ----------
+function ring(c, members, highlightId) {
+  const n = members.length, cx = 160, cy = 160, R = 120;
+  let s = `<svg viewBox="0 0 320 320" class="ring" role="img" aria-label="Circle of ${n} members"><circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#eadfd3" stroke-width="2" stroke-dasharray="4 6"/>`;
+  members.forEach((m, i) => {
     const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
     const x = cx + R * Math.cos(a), y = cy + R * Math.sin(a);
-    const isR = c.recipient && c.recipient.id === m.id;
-    s += `<circle cx="${x}" cy="${y}" r="28" fill="${m.paid ? '#16a34a' : '#e9e3ee'}" stroke="${isR ? '#f5b301' : '#fff'}" stroke-width="${isR ? 6 : 3}"/>`;
+    const isR = m.current;
+    const fill = m.paid ? '#16a34a' : m.received ? '#bae6fd' : '#e9e3ee';
+    const stroke = isR ? '#f5b301' : m.id && m.id === highlightId ? '#7c3aed' : '#fff';
+    s += `<circle cx="${x}" cy="${y}" r="28" fill="${fill}" stroke="${stroke}" stroke-width="${isR || (m.id && m.id === highlightId) ? 6 : 3}"/>`;
     s += `<text x="${x}" y="${y + 5}" text-anchor="middle" font-size="15" font-weight="700" fill="${m.paid ? '#fff' : '#2a2230'}">${esc(m.name.slice(0, 2))}</text>`;
     s += `<circle cx="${x + 21}" cy="${y - 21}" r="10" fill="#2a2230"/><text x="${x + 21}" y="${y - 17}" text-anchor="middle" font-size="11" fill="#fff">${m.position}</text>`;
   });
@@ -105,49 +213,201 @@ function ring(c) {
   return s + '</svg>';
 }
 
-function render() {
-  const b = $('#badges');
-  b.innerHTML = `<span class="badge ${S.paypalConfigured ? '' : 'off'}">PayPal sandbox: ${S.paypalConfigured ? 'connected' : 'not configured'}</span>` +
-    `<span class="badge ${S.aiEnabled ? '' : 'off'}">AI coordinator: ${S.aiEnabled ? 'on' : 'off'}</span>`;
-  const app = $('#app');
-  const c = S.circle;
-  if (!c) {
-    app.innerHTML = `<div class="card empty"><h2>No circle yet</h2><p>Lending circles (tandas, susus, chit funds) move billions of dollars a year, mostly through spreadsheets and group chats. Start a demo circle to see an AI coordinate one.</p><button onclick="seed()">Load demo circle</button></div>`;
-    return;
-  }
-  const paidCount = c.members.filter((m) => m.paid).length;
-  const all = paidCount === c.members.length;
-  const canPlan = c.round === 0 && paidCount === 0;
-  const done = c.status === 'complete';
+const ACTOR = { agent: 'AI', paypal: 'PayPal', organizer: 'You', system: 'Circle' };
+const when = (t) => new Date(t).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const memberLink = (token) => `${location.origin}/?c=${encodeURIComponent(V.id)}&key=${encodeURIComponent(token)}`;
 
-  let html = `<div class="grid"><div class="card"><strong>${esc(c.name)}</strong><div style="color:var(--muted);font-size:14px">${esc(c.currency)} ${c.amount} per person per round</div>${ring(c)}</div><div class="card">`;
-  html += `<div class="actions">`;
-  if (canPlan) html += `<button class="gold" onclick="planAI()">Let AI plan the rotation</button>`;
-  if (!done) html += `<button ${all ? '' : 'disabled'} onclick="payout()">Pay out ${esc(c.currency)} ${c.pot} to ${esc(c.recipient.name)}</button>`;
-  html += `<button class="ghost" onclick="seed()">Reset demo</button></div>`;
-  if (c.rationale) html += `<div class="note"><strong>Coordinator's plan.</strong> ${esc(c.rationale)}</div>`;
-  if (!done) html += `<div style="font-size:14px;color:var(--muted);margin-bottom:6px">${paidCount} of ${c.members.length} paid this round. Receiving: <strong style="color:var(--ink)">${esc(c.recipient.name)}</strong>. Days late for nudges: <input id="days" type="number" min="1" value="3"></div>`;
-  c.members.forEach((m) => {
-    const isR = c.recipient && c.recipient.id === m.id;
-    html += `<div class="row"><div class="pos">${m.position}</div><div class="who"><strong>${esc(m.name)}</strong> ${isR ? '<span class="tag" style="background:#fef3c7;color:#92400e">receives this round</span>' : ''}` +
-      `${m.risk ? ` <span class="tag ${m.risk.level}">${esc(m.risk.level)} risk</span><small>${esc(m.risk.reason)}</small>` : `<small>${esc(m.note)}</small>`}</div>`;
-    if (!done) html += m.paid ? `<span class="paid">Paid</span>` : `<button onclick="pay('${m.id}')">Pay with PayPal</button><button class="ghost" onclick="nudge('${m.id}')">Nudge</button>`;
-    html += `</div>`;
-  });
-  if (nudgeText) html += `<div class="note"><strong>Draft nudge for ${esc(nudgeText.name)}:</strong><br>${esc(nudgeText.text)}</div>`;
-  if (c.payouts.length) {
-    html += `<h3 style="margin:18px 0 6px">Payout history</h3>`;
-    c.payouts.forEach((p) => { html += `<div style="font-size:14px">Round ${p.round + 1}: ${esc(c.currency)} ${p.amount} to <strong>${esc(p.recipient)}</strong> <span style="color:var(--muted)">(${esc(p.status || 'sent')})</span></div>`; });
-  }
-  html += `</div></div>`;
-  app.innerHTML = html;
+// ---------- organizer view ----------
+function organizer() {
+  const c = V;
+  const done = c.status === 'complete';
+  const paidCount = c.members.filter((m) => m.paid).length;
+  const all = !done && paidCount === c.members.length;
+  const ringMembers = c.members.map((m) => ({ ...m, current: !done && m.position === c.round + 1 }));
+
+  const members = c.members.map((m) => {
+    const isR = !done && m.position === c.round + 1;
+    let status = '';
+    if (m.received) status = '<span class="tag got">received</span>';
+    if (isR) status += ' <span class="tag recv">receives this round</span>';
+    const risk = m.risk ? ` <span class="tag ${m.risk.level}">${esc(m.risk.level)} risk</span>` : '';
+    const detail = m.risk ? m.risk.reason : m.note;
+    let right = '';
+    if (!done) {
+      if (m.paid) right = `<span class="paid" title="Confirmed by: ${esc(m.confirmedBy.join(', '))}">Paid${m.confirmedBy.includes('webhook') ? ' ✓✓' : ' ✓'}</span>`;
+      else if (m.paymentStatus === 'PENDING') right = '<span class="tag pend">pending at PayPal</span>';
+      else right = `<button class="sm" data-act="pay" data-id="${esc(m.id)}" ${dis()}>${spin('pay' + m.id, 'Pay with PayPal')}</button>`;
+    }
+    return `<div class="row"><div class="pos ${m.received ? 'done' : ''}">${m.position}</div>
+      <div class="who"><strong>${esc(m.name)}</strong>${status}${risk}${m.remindersThisRound ? ` <span class="tag" style="background:#f3f4f6;color:#4b5563">${m.remindersThisRound} reminder${m.remindersThisRound > 1 ? 's' : ''}</span>` : ''}<small>${esc(detail || '')}</small></div>
+      <div class="actions">${right}<button class="ghost sm" data-act="copy" data-token="${esc(m.token)}" title="Copy this member's private link">Link</button></div></div>`;
+  }).join('');
+
+  const proposals = c.proposals.map((p) => `
+    <div class="approve"><strong>${p.type === 'payout' ? 'Payout waiting for your approval' : 'Position swap suggested'}</strong>
+      <div>${esc(p.summary)}</div>${p.reason ? `<div class="muted small">${esc(p.reason)}</div>` : ''}
+      <div class="actions" style="margin-top:8px"><button class="${p.type === 'payout' ? 'ok' : ''} sm" data-act="approve" data-id="${esc(p.id)}" ${dis()}>${spin('approve' + p.id, 'Approve')}</button><button class="ghost sm" data-act="decline" data-id="${esc(p.id)}" ${dis()}>Decline</button></div></div>`).join('');
+
+  const feed = c.activity.map((x) => `<li><span class="who-dot a-${esc(x.actor)}">${esc(ACTOR[x.actor] || x.actor)}</span><div><div>${esc(x.text)}</div><div class="muted" style="font-size:12px">${when(x.at)}</div></div></li>`).join('');
+
+  const reminders = c.reminders.slice(0, 6).map((r) => `<div class="msg"><small>To ${esc(r.name)} · ${r.daysLate} day${r.daysLate === 1 ? '' : 's'} late · ${when(r.at)}${r.by === 'template' ? ' · template' : ''}</small>${esc(r.text)}</div>`).join('');
+
+  const payouts = c.payouts.map((p) => `<div class="small">Round ${p.round + 1}: ${esc(c.currency)} ${p.amount} to <strong>${esc(p.recipient)}</strong> <span class="muted">(${esc(p.itemStatus || p.status || 'sent')})</span></div>`).join('');
+
+  return `
+  <div class="card" style="margin-bottom:18px">
+    <div class="actions" style="justify-content:space-between">
+      <div><h2 style="margin:0">${esc(c.name)}</h2><div class="muted small">${esc(c.currency)} ${c.amount} per person per round · organizer view</div></div>
+      ${done ? '' : `<div class="clock"><span class="muted">Day ${c.daysIntoRound + 1} of this round · due after day ${c.dueAfterDays}${c.daysLate ? ` · <strong style="color:var(--bad)">${c.daysLate} day${c.daysLate > 1 ? 's' : ''} late</strong>` : ''}</span>
+        <button class="ghost sm" data-act="clock" data-days="1" ${dis()} title="Demo: move this circle's clock forward">+1 day</button>
+        <button class="ghost sm" data-act="clock" data-days="3" ${dis()} title="Demo: move this circle's clock forward">+3 days</button></div>`}
+    </div>
+  </div>
+  <div class="grid">
+    <div class="stack">
+      <div class="card">${ring(c, ringMembers)}
+        ${c.canPlan ? `<button class="gold" style="width:100%;margin-top:8px" data-act="plan" ${dis()}>${spin('plan', 'Let AI plan the rotation')}</button>` : ''}
+        ${c.rationale ? `<div class="note"><strong>Coordinator's plan.</strong> ${esc(c.rationale)}</div>` : ''}
+      </div>
+      <div class="card">
+        <h3>PayPal</h3>
+        ${done ? '' : `<button style="width:100%" data-act="payout" ${all && !busy ? '' : 'disabled'}>${spin('payout', `Pay out ${esc(c.currency)} ${c.pot} to ${esc(c.recipient?.name)}`)}</button>
+        <p class="muted small" style="margin:6px 0 10px">${paidCount} of ${c.members.length} paid this round.</p>`}
+        ${payouts || '<p class="muted small" style="margin:0">No payouts yet.</p>'}
+        <button class="ghost sm" style="margin-top:10px" data-act="sync" ${dis()}>${spin('sync', 'Check PayPal now')}</button>
+      </div>
+    </div>
+    <div class="stack">
+      ${done ? '' : `<div class="card">
+        <h3>AI coordinator</h3>
+        <p class="muted small" style="margin-top:0">Runs today's check-in: syncs payments with PayPal, reminds late members, suggests swaps, and asks you to approve the payout. It can't send money without you.</p>
+        <label for="instr">Anything the coordinator should know? (optional)</label>
+        <textarea id="instr" rows="2" placeholder="e.g. Tomas told me he gets paid on Friday" maxlength="500">${esc($('#instr')?.value || '')}</textarea>
+        <div class="actions" style="margin-top:8px"><button class="gold" data-act="checkin" ${dis()}>${spin('checkin', 'Run AI check-in')}</button></div>
+        ${lastSummary ? `<div class="note"><strong>Coordinator:</strong> ${esc(lastSummary)}</div>` : ''}
+        ${proposals}
+      </div>`}
+      ${done ? proposals : ''}
+      <div class="card"><h3>Members</h3>${members}</div>
+      ${reminders ? `<div class="card"><h3>Reminders sent</h3>${reminders}</div>` : ''}
+      <div class="card"><h3>Activity</h3><ul class="feed">${feed || '<li class="muted">Nothing yet.</li>'}</ul></div>
+    </div>
+  </div>`;
 }
 
-const q = new URLSearchParams(location.search);
-if (q.get('paid')) toast(`${q.get('paid')}'s contribution received`);
-if (q.get('error')) toast(q.get('error'), true);
-if (q.toString()) history.replaceState(null, '', '/');
-run(refresh);
+// ---------- member view ----------
+function member() {
+  const c = V, me = c.me;
+  const done = c.status === 'complete';
+  const ringMembers = c.schedule.map((x) => ({ ...x, paid: false, id: x.position === me.position ? me.id : null }));
+  let main;
+  if (done) main = `<div class="big">Circle complete</div><p class="muted">Everyone has received the pot. Thank you for being part of ${esc(c.name)}.</p>`;
+  else if (me.paid) main = `<div class="big" style="color:var(--ok)">You've paid for round ${c.round + 1} ✓</div><p class="muted">${c.paidCount} of ${c.totalRounds} members have paid. ${esc(c.recipientName)} receives this round.</p>`;
+  else if (me.paymentStatus === 'PENDING') main = `<div class="big">Payment pending</div><p class="muted">PayPal is still processing your payment.</p>`;
+  else main = `<div class="big">${esc(c.currency)} ${c.amount} due for round ${c.round + 1}</div>
+    <p class="muted">Due by day ${c.dueAfterDays} of the round (today is day ${c.daysIntoRound + 1}). ${esc(c.recipientName)} receives this round.</p>
+    <button data-act="pay" data-id="${esc(me.id)}" ${dis()}>${spin('pay' + me.id, 'Pay with PayPal')}</button>`;
+  const yourTurn = me.received ? 'You have already received your pot.' : me.isRecipient ? `You receive the pot this round: ${esc(c.currency)} ${c.pot}.` : `You receive ${esc(c.currency)} ${c.pot} in round ${me.position}.`;
+  return `
+  <div class="grid">
+    <div class="stack">
+      <div class="card">${ring(c, ringMembers, me.id)}<p class="small" style="text-align:center;margin:6px 0 0"><strong>${yourTurn}</strong></p></div>
+      <div class="card"><h3>Schedule</h3>${c.schedule.map((x) => `<div class="row"><div class="pos ${x.received ? 'done' : ''}">${x.position}</div><div class="who">${esc(x.name)}${x.position === me.position ? ' (you)' : ''}</div>${x.current ? '<span class="tag recv">this round</span>' : x.received ? '<span class="tag got">received</span>' : ''}</div>`).join('')}</div>
+    </div>
+    <div class="stack">
+      <div class="card"><div class="muted small">Hi ${esc(me.name)} · ${esc(c.name)}</div>${main}</div>
+      <div class="card"><h3>Messages from your circle's coordinator</h3>${c.reminders.length ? c.reminders.map((r) => `<div class="msg"><small>${when(r.at)}</small>${esc(r.text)}</div>`).join('') : '<p class="muted small" style="margin:0">No messages. You are all caught up.</p>'}</div>
+    </div>
+  </div>`;
+}
+
+// ---------- render & events ----------
+function render() {
+  renderBadges();
+  const app = $('#app');
+  const focus = document.activeElement?.id;
+  if (!CID) app.innerHTML = landing();
+  else if (!V) app.innerHTML = '<div class="card muted">Loading…</div>';
+  else app.innerHTML = V.role === 'organizer' ? organizer() : member();
+  if (focus && document.getElementById(focus)) document.getElementById(focus).focus();
+}
+
+function go(id, key) { location.href = `/?c=${encodeURIComponent(id)}&key=${encodeURIComponent(key)}`; }
+
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); toast('Member link copied. Send it to them privately.'); }
+  catch { prompt('Copy this member link:', text); }
+}
+
+document.addEventListener('input', (e) => {
+  const el = e.target;
+  if (CID || !el.dataset.f) return;
+  if (el.dataset.m !== undefined) form.members[Number(el.dataset.m)][el.dataset.f] = el.value;
+  else form[el.dataset.f] = el.value;
+});
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-act]');
+  if (!b || b.disabled) return;
+  const id = b.dataset.id;
+  switch (b.dataset.act) {
+    case 'demo': return act('demo', async () => { const r = await api('/api/circles/demo', {}); remember({ id: r.id, key: r.key, name: 'Tanda de Noviembre (demo)', role: 'organizer' }); go(r.id, r.key); });
+    case 'add': form.members.push({}); return render();
+    case 'rm': form.members.splice(Number(b.dataset.i), 1); return render();
+    case 'create': return act('create', async () => {
+      const body = { ...form, amount: Number(form.amount), dueAfterDays: Number(form.dueAfterDays), members: form.members.filter((m) => m.name || m.email) };
+      const r = await api('/api/circles', body);
+      remember({ id: r.id, key: r.key, name: form.name, role: 'organizer' });
+      go(r.id, r.key);
+    });
+    case 'plan': return act('plan', async () => {
+      V = await circleApi('plan', {});
+      const failed = /^AI planning (failed|is off)/.test(V.rationale || '');
+      toast(failed ? V.rationale : 'Rotation planned', failed);
+    });
+    case 'pay': return act('pay' + id, async () => { const d = await circleApi('pay', { memberId: id }); location.href = d.approveUrl; await new Promise(() => {}); });
+    case 'payout': return act('payout', async () => { V = await circleApi('payout', {}); toast('Payout sent through PayPal'); });
+    case 'approve': return act('approve' + id, async () => { V = await circleApi(`proposals/${encodeURIComponent(id)}`, { approve: true }); toast('Approved'); });
+    case 'decline': return act('decline' + id, async () => { V = await circleApi(`proposals/${encodeURIComponent(id)}`, { approve: false }); });
+    case 'clock': return act('clock', async () => { V = await circleApi('clock', { days: Number(b.dataset.days) }); });
+    case 'sync': return act('sync', async () => { V = await circleApi('sync', {}); toast('Checked with PayPal'); });
+    case 'checkin': return act('checkin', async () => {
+      const instruction = $('#instr')?.value || '';
+      const r = await circleApi('checkin', { instruction });
+      V = r.circle;
+      lastSummary = r.summary;
+      if ($('#instr')) $('#instr').value = '';
+    });
+    case 'copy': return copy(memberLink(b.dataset.token));
+  }
+});
+
+async function boot() {
+  STATUS = await api('/api/status').catch(() => ({}));
+  const paid = params.get('paid'), err = params.get('error');
+  if (paid) toast(`${paid}'s contribution received`);
+  if (err) toast(err, true);
+  if (paid || err) { params.delete('paid'); params.delete('error'); history.replaceState(null, '', `/?${params}`); }
+  if (CID) {
+    try {
+      V = await circleApi('');
+      remember({ id: CID, key: KEY, name: V.name, role: V.role });
+    } catch (e) {
+      $('#app').innerHTML = `<div class="card"><h3>Can't open this circle</h3><p class="muted">${esc(e.message)}</p><a class="link" href="/">Back to start</a></div>`;
+      renderBadges();
+      return;
+    }
+  }
+  render();
+}
+
+// Keep the organizer view fresh (webhooks and members' payments arrive in the background).
+setInterval(async () => {
+  if (!CID || !V || busy || document.hidden) return;
+  try { V = await circleApi(''); render(); } catch {}
+}, 15000);
+
+boot();
 </script>
 </body>
 </html>

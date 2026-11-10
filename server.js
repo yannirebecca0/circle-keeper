@@ -14,223 +14,266 @@ try {
 
 const paypal = require('./paypal');
 const ai = require('./ai');
+const store = require('./store');
+const C = require('./circle');
+const agent = require('./agent');
 
 const PORT = process.env.PORT || 3000;
-const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
-const DATA_FILE = path.join(__dirname, 'data.json');
+// On Render, RENDER_EXTERNAL_URL is set automatically.
+const BASE_URL = (process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
-// ---------- tiny JSON store ----------
-const load = () => {
-  try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch { return null; }
-};
-const save = (s) => fs.writeFileSync(DATA_FILE, JSON.stringify(s, null, 2));
-
-const fail = (status, message) => {
-  const e = new Error(message);
-  e.status = status;
-  throw e;
-};
-
-function seedDemo() {
-  const emails = (process.env.DEMO_EMAILS || '').split(',').map((s) => s.trim()).filter(Boolean);
-  const people = [
-    { name: 'Maria', note: "Organizer. Always pays on the 1st. Needs funds soon for her daughter's tuition deposit." },
-    { name: 'Ayesha', note: 'Salaried nurse, very steady. Has never missed a payment in past circles.' },
-    { name: 'Dev', note: 'Freelancer with irregular income. Paid late twice last year but always caught up.' },
-    { name: 'Luz', note: 'New to the circle, a friend of Maria. No payment history yet. Saving for a down payment.' },
-    { name: 'Tomas', note: 'Recently changed jobs and says money is tight this quarter. Maria\'s cousin.' },
-  ];
-  const members = people.map((p, i) => ({
-    id: `m${i + 1}`,
-    name: p.name,
-    email: emails[i] || `member${i + 1}@example.com`,
-    note: p.note,
-  }));
-  return {
-    id: `c${Date.now().toString(36)}`,
-    name: 'Tanda de Noviembre',
-    amount: 20,
-    currency: 'USD',
-    members,
-    order: members.map((m) => m.id),
-    round: 0,
-    contributions: {}, // contributions[round][memberId] = { orderId, captureId, status }
-    pending: {}, // pending[orderId] = { memberId, round }
-    payouts: [],
-    risks: {},
-    rationale: '',
-  };
-}
-
-// ---------- view model ----------
-function view(s) {
-  if (!s) return { circle: null, aiEnabled: ai.enabled(), paypalConfigured: paypal.configured() };
-  const n = s.members.length;
-  const ordered = s.order.map((id) => s.members.find((m) => m.id === id));
-  const contribs = s.contributions[s.round] || {};
-  const done = s.round >= n;
-  return {
-    aiEnabled: ai.enabled(),
-    paypalConfigured: paypal.configured(),
-    circle: {
-      id: s.id,
-      name: s.name,
-      amount: s.amount,
-      currency: s.currency,
-      status: done ? 'complete' : 'active',
-      round: s.round,
-      totalRounds: n,
-      pot: Number((s.amount * n).toFixed(2)),
-      recipient: done ? null : ordered[s.round],
-      members: ordered.map((m, i) => ({
-        ...m,
-        position: i + 1,
-        paid: !!(contribs[m.id] && contribs[m.id].status === 'COMPLETED'),
-        risk: s.risks[m.id] || null,
-      })),
-      payouts: s.payouts,
-      rationale: s.rationale,
-    },
-  };
-}
-
 // ---------- http helpers ----------
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  // Page URLs carry access keys, so never leak them to PayPal or anyone else via Referer.
+  'Referrer-Policy': 'no-referrer',
+};
 const send = (res, code, obj) => {
-  res.writeHead(code, { 'Content-Type': 'application/json' });
+  res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
   res.end(JSON.stringify(obj));
 };
-const readBody = (req) =>
+const redirect = (res, location) => {
+  res.writeHead(302, { Location: location, ...SECURITY_HEADERS });
+  res.end();
+};
+const readRaw = (req) =>
   new Promise((resolve, reject) => {
-    let raw = '';
-    req.on('data', (c) => { raw += c; if (raw.length > 1e6) reject(new Error('Body too large')); });
-    req.on('end', () => { try { resolve(raw ? JSON.parse(raw) : {}); } catch { reject(new Error('Invalid JSON')); } });
+    const chunks = [];
+    let size = 0;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > 1e6) {
+        reject(Object.assign(new Error('Body too large'), { status: 413 }));
+        req.destroy();
+      } else chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
   });
+const readBody = async (req) => {
+  const raw = await readRaw(req);
+  try {
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    C.fail(400, 'Invalid JSON');
+  }
+};
 
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
 
-function serveStatic(req, res, pathname) {
+function serveStatic(res, pathname) {
   const file = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
-  if (!file.startsWith(PUBLIC_DIR) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
-    res.writeHead(404);
+  if (!file.startsWith(PUBLIC_DIR + path.sep) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+    res.writeHead(404, SECURITY_HEADERS);
     return res.end('Not found');
   }
-  res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+  res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', ...SECURITY_HEADERS });
   fs.createReadStream(file).pipe(res);
+}
+
+// Simple per-IP limit for AI calls, so a public demo can't run up the AI bill.
+const aiHits = new Map();
+function limitAI(req) {
+  const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+  const hour = 60 * 60 * 1000;
+  const hits = (aiHits.get(ip) || []).filter((t) => Date.now() - t < hour);
+  if (hits.length >= (Number(process.env.AI_LIMIT_PER_HOUR) || 40)) C.fail(429, 'Too many AI requests from you this hour. Try again later.');
+  hits.push(Date.now());
+  aiHits.set(ip, hits);
+}
+
+const backTo = (s, key, q) => `/?c=${encodeURIComponent(s.id)}&key=${encodeURIComponent(key)}&${q}`;
+
+const viewFor = ({ s, role, member }) => (role === 'organizer' ? C.organizerView(s) : C.memberView(s, member));
+const needOrganizer = (a) => a.role === 'organizer' || C.fail(403, 'Only the organizer can do this.');
+
+// ---------- webhooks ----------
+const CAPTURE_STATUS = { COMPLETED: 'COMPLETED', PENDING: 'PENDING', DENIED: 'DENIED', REFUNDED: 'REFUNDED', REVERSED: 'REVERSED', DECLINED: 'DENIED' };
+
+function handleWebhookEvent(event) {
+  const type = String(event.event_type || '');
+  const r = event.resource || {};
+  if (type.startsWith('PAYMENT.CAPTURE.')) {
+    const ref = paypal.parseCustomId(r.custom_id);
+    const s = ref && store.get(ref.circleId);
+    const status = CAPTURE_STATUS[type.slice('PAYMENT.CAPTURE.'.length)];
+    if (!s || !status) return;
+    C.recordContribution(s, {
+      memberId: ref.memberId,
+      round: ref.round,
+      orderId: r.supplementary_data?.related_ids?.order_id,
+      captureId: r.id,
+      status,
+      via: 'webhook',
+    });
+    return;
+  }
+  if (type.startsWith('PAYMENT.PAYOUTSBATCH.') || type.startsWith('PAYMENT.PAYOUTS-ITEM.')) {
+    const batchId = r.batch_header?.payout_batch_id || r.payout_batch_id;
+    if (!batchId) return;
+    for (const s of store.all()) {
+      const p = s.payouts.find((x) => x.payoutBatchId === batchId);
+      if (!p) continue;
+      if (r.batch_header?.batch_status) p.status = r.batch_header.batch_status;
+      if (r.transaction_status) p.itemStatus = r.transaction_status;
+      C.log(s, 'paypal', `Round ${p.round + 1} payout to ${p.recipient}: ${p.itemStatus || p.status} (PayPal webhook).`);
+      store.save();
+      return;
+    }
+  }
 }
 
 // ---------- routes ----------
 async function handle(req, res) {
   const url = new URL(req.url, BASE_URL);
-  const route = `${req.method} ${url.pathname}`;
+  const parts = url.pathname.split('/').filter(Boolean);
+  const method = req.method;
 
-  if (route === 'GET /api/circle') return send(res, 200, view(load()));
-
-  if (route === 'POST /api/demo') {
-    save(seedDemo());
-    return send(res, 200, view(load()));
-  }
-
-  if (route === 'POST /api/circle/plan') {
-    const s = load() || fail(404, 'No circle yet. Load the demo circle first.');
-    if (s.round > 0 || Object.keys(s.contributions).length) fail(400, 'The rotation is locked once money has moved.');
-    const plan = await ai.planRotation(s.members, s.amount, s.currency);
-    s.order = plan.order;
-    s.rationale = plan.rationale;
-    s.risks = plan.risks;
-    save(s);
-    return send(res, 200, view(s));
-  }
-
-  if (route === 'POST /api/circle/pay') {
-    const s = load() || fail(404, 'No circle yet.');
-    const { memberId } = await readBody(req);
-    const member = s.members.find((m) => m.id === memberId) || fail(400, 'Unknown member');
-    if (s.round >= s.members.length) fail(400, 'This circle is complete.');
-    const existing = (s.contributions[s.round] || {})[memberId];
-    if (existing && existing.status === 'COMPLETED') fail(400, `${member.name} already paid this round.`);
-    const { orderId, approveUrl } = await paypal.createContributionOrder({
-      amount: s.amount,
-      currency: s.currency,
-      memberId,
-      round: s.round,
-      circleName: s.name,
-      returnUrl: `${BASE_URL}/paypal/return`,
-      cancelUrl: `${BASE_URL}/paypal/cancel`,
+  // App status (no circle needed)
+  if (method === 'GET' && url.pathname === '/api/status') {
+    return send(res, 200, {
+      aiEnabled: ai.enabled(),
+      aiProvider: ai.providerName(),
+      paypalConfigured: paypal.configured(),
+      webhooks: paypal.webhooksConfigured(),
+      demoEmails: !!process.env.DEMO_EMAILS,
     });
-    s.pending[orderId] = { memberId, round: s.round };
-    save(s);
-    return send(res, 200, { approveUrl });
   }
 
-  if (route === 'GET /paypal/return') {
+  if (method === 'POST' && url.pathname === '/api/circles/demo') {
+    const s = C.createDemo();
+    return send(res, 200, { id: s.id, key: s.adminKey });
+  }
+
+  if (method === 'POST' && url.pathname === '/api/circles') {
+    const s = C.createCircle(await readBody(req));
+    return send(res, 200, { id: s.id, key: s.adminKey });
+  }
+
+  // Circle routes: /api/c/:id[/action...] with the access key in the X-Circle-Key header.
+  if (parts[0] === 'api' && parts[1] === 'c' && parts[2]) {
+    const a = C.access(parts[2], req.headers['x-circle-key']);
+    const { s } = a;
+    const action = parts.slice(3).join('/');
+
+    if (method === 'GET' && action === '') return send(res, 200, viewFor(a));
+
+    if (method === 'POST' && action === 'pay') {
+      const { memberId } = await readBody(req);
+      if (a.role === 'member' && memberId !== a.member.id) C.fail(403, 'You can only pay your own contribution.');
+      const returnKey = a.role === 'member' ? a.member.token : s.adminKey;
+      const approveUrl = await C.startPayment(s, memberId, { baseUrl: BASE_URL, returnKey });
+      return send(res, 200, { approveUrl });
+    }
+
+    needOrganizer(a);
+
+    if (method === 'POST' && action === 'plan') {
+      if (C.moneyMoved(s)) C.fail(400, 'The rotation is locked once money has moved.');
+      if (ai.enabled()) limitAI(req);
+      const plan = await ai.planRotation(s.members, s.amount, s.currency);
+      if (C.moneyMoved(s)) C.fail(400, 'The rotation is locked once money has moved.');
+      s.order = plan.order;
+      s.rationale = plan.rationale;
+      s.risks = plan.risks;
+      C.log(s, plan.usedAI ? 'agent' : 'system', plan.usedAI ? 'Planned the payout order and flagged risks.' : 'Kept sign-up order (AI planning unavailable).');
+      store.save();
+      return send(res, 200, C.organizerView(s));
+    }
+
+    if (method === 'POST' && action === 'checkin') {
+      const { instruction } = await readBody(req);
+      if (ai.enabled()) limitAI(req);
+      const result = await agent.runCheckIn(s, instruction);
+      return send(res, 200, { ...result, circle: C.organizerView(s) });
+    }
+
+    if (method === 'POST' && action === 'payout') {
+      await C.payout(s, 'organizer');
+      return send(res, 200, C.organizerView(s));
+    }
+
+    if (method === 'POST' && parts[3] === 'proposals' && parts[4]) {
+      const { approve } = await readBody(req);
+      await C.decide(s, parts[4], approve === true);
+      return send(res, 200, C.organizerView(s));
+    }
+
+    if (method === 'POST' && action === 'clock') {
+      // Demo helper: move this circle's clock forward to show how lateness changes the coordinator's behavior.
+      const { days } = await readBody(req);
+      const d = Math.round(Number(days));
+      if (!(d >= 1 && d <= 14)) C.fail(400, 'Skip ahead 1 to 14 days.');
+      s.clockOffsetDays = (s.clockOffsetDays || 0) + d;
+      C.log(s, 'system', `Demo clock moved forward ${d} day${d === 1 ? '' : 's'}.`);
+      store.save();
+      return send(res, 200, C.organizerView(s));
+    }
+
+    if (method === 'POST' && action === 'sync') {
+      await C.syncPayments(s);
+      await C.refreshPayoutStatus(s).catch(() => null);
+      return send(res, 200, C.organizerView(s));
+    }
+
+    return send(res, 404, { error: 'Not found' });
+  }
+
+  // PayPal sends the member back here after they approve the payment.
+  if (method === 'GET' && url.pathname === '/paypal/return') {
     const orderId = url.searchParams.get('token');
-    const s = load();
-    const back = (q) => { res.writeHead(302, { Location: `/?${q}` }); res.end(); };
-    if (!s || !orderId || !s.pending[orderId]) return back('error=' + encodeURIComponent('Unknown PayPal order'));
+    const s = orderId && store.all().find((x) => x.pending[orderId]);
+    if (!s) return redirect(res, '/?error=' + encodeURIComponent('Unknown or already processed PayPal order'));
+    const { returnKey } = s.pending[orderId];
     try {
-      const { memberId, round } = s.pending[orderId];
-      const cap = await paypal.captureOrder(orderId);
-      if (cap.status !== 'COMPLETED') return back('error=' + encodeURIComponent(`Payment status: ${cap.status}`));
-      s.contributions[round] = s.contributions[round] || {};
-      s.contributions[round][memberId] = { orderId, captureId: cap.captureId, status: 'COMPLETED', at: new Date().toISOString() };
-      delete s.pending[orderId];
-      save(s);
-      const name = s.members.find((m) => m.id === memberId).name;
-      return back('paid=' + encodeURIComponent(name));
+      const { member, status } = await C.captureForMember(s, orderId, 'redirect');
+      return redirect(res, backTo(s, returnKey, status === 'COMPLETED' ? 'paid=' + encodeURIComponent(member.name) : 'error=' + encodeURIComponent('Payment is pending at PayPal')));
     } catch (e) {
-      return back('error=' + encodeURIComponent(e.message));
+      return redirect(res, backTo(s, returnKey, 'error=' + encodeURIComponent(e.message)));
     }
   }
 
-  if (route === 'GET /paypal/cancel') {
-    res.writeHead(302, { Location: '/?error=' + encodeURIComponent('Payment cancelled') });
-    return res.end();
+  if (method === 'GET' && url.pathname === '/paypal/cancel') {
+    const c = url.searchParams.get('c');
+    const key = url.searchParams.get('key');
+    const q = 'error=' + encodeURIComponent('Payment cancelled');
+    return redirect(res, c && key ? `/?c=${encodeURIComponent(c)}&key=${encodeURIComponent(key)}&${q}` : `/?${q}`);
   }
 
-  if (route === 'POST /api/circle/payout') {
-    const s = load() || fail(404, 'No circle yet.');
-    if (s.round >= s.members.length) fail(400, 'This circle is complete.');
-    const v = view(s).circle;
-    if (!v.members.every((m) => m.paid)) fail(400, 'Everyone has to contribute before the payout.');
-    const recipient = v.recipient;
-    const result = await paypal.sendPayout({
-      email: recipient.email,
-      amount: v.pot,
-      currency: s.currency,
-      note: `${s.name}: round ${s.round + 1} payout`,
-      batchId: `${s.id}-r${s.round}-${Date.now()}`,
-      itemId: `${s.id}-r${s.round}`,
+  // PayPal webhooks: signed events confirming captures, refunds and payout results.
+  if (method === 'POST' && url.pathname === '/api/paypal/webhook') {
+    const raw = await readRaw(req);
+    let event;
+    try {
+      event = JSON.parse(raw);
+    } catch {
+      return send(res, 400, { error: 'Invalid JSON' });
+    }
+    if (!paypal.webhooksConfigured()) return send(res, 200, { ignored: 'PAYPAL_WEBHOOK_ID is not set' });
+    const verified = await paypal.verifyWebhook(req.headers, raw).catch((e) => {
+      console.error('Webhook verification error:', e.message);
+      return false;
     });
-    s.payouts.push({ round: s.round, recipient: recipient.name, amount: v.pot, ...result, at: new Date().toISOString() });
-    s.round += 1;
-    save(s);
-    return send(res, 200, view(s));
+    if (!verified) return send(res, 400, { error: 'Signature verification failed' });
+    handleWebhookEvent(event);
+    return send(res, 200, { ok: true });
   }
 
-  if (route === 'POST /api/circle/nudge') {
-    const s = load() || fail(404, 'No circle yet.');
-    const { memberId, daysLate } = await readBody(req);
-    const member = s.members.find((m) => m.id === memberId) || fail(400, 'Unknown member');
-    const text = await ai.draftNudge({
-      member,
-      daysLate: Number(daysLate) || 3,
-      circleName: s.name,
-      amount: s.amount,
-      currency: s.currency,
-    });
-    return send(res, 200, { text });
-  }
-
-  if (req.method === 'GET') return serveStatic(req, res, url.pathname);
+  if (method === 'GET' && !url.pathname.startsWith('/api/')) return serveStatic(res, url.pathname);
   send(res, 404, { error: 'Not found' });
 }
 
 http
   .createServer((req, res) => {
-    handle(req, res).catch((e) => send(res, e.status || 500, { error: e.message }));
+    handle(req, res).catch((e) => {
+      if (!e.status) console.error(e);
+      if (!res.headersSent) send(res, e.status || 500, { error: e.message });
+    });
   })
   .listen(PORT, () => {
     console.log(`Circle Keeper running at ${BASE_URL}`);
-    console.log(`PayPal: ${paypal.configured() ? 'configured' : 'NOT configured'} | AI: ${ai.enabled() ? 'on (' + ai.providerName() + ')' : 'off'}`);
+    console.log(`PayPal: ${paypal.configured() ? 'configured' : 'NOT configured'} | Webhooks: ${paypal.webhooksConfigured() ? 'on' : 'off (set PAYPAL_WEBHOOK_ID)'} | AI: ${ai.enabled() ? 'on (' + ai.providerName() + ')' : 'off'}`);
+    if (!process.env.DEMO_EMAILS) console.warn('Warning: DEMO_EMAILS is not set, so demo payouts go to placeholder @example.com addresses.');
+    console.log(`Data file: ${store.DATA_FILE}`);
   });
