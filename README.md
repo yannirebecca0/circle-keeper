@@ -6,7 +6,7 @@ Lending circles (tandas, susus, chit funds, hui) are one of the oldest ways peop
 
 Circle Keeper gives every circle a coordinator. An AI agent plans the payout order, keeps track of payments through PayPal, reminds late members in the right tone, and suggests changes when someone is struggling. PayPal collects every contribution and pays out the pot. The organizer stays in control: **the agent can't move money without the organizer's approval.**
 
-> **Try it:** **https://circle-keeper.onrender.com** · Sandbox buyer login for checkout: `<sandbox email>` / `<sandbox password>`
+> **Try it:** **https://circle-keeper.onrender.com** · Sandbox buyer login for checkout: `ck-ayesha-48213@personal.example.com` / `J0nhD03!`
 
 ## What it does
 
