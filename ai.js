@@ -30,7 +30,7 @@ async function geminiOnce(model, body) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
-    signal: AbortSignal.timeout(25000),
+    signal: AbortSignal.timeout(45000),
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
@@ -81,7 +81,7 @@ async function claudeOnce(body) {
         // Server-side fallback: if the model declines a request, the API retries it on a fallback model.
         'anthropic-beta': 'server-side-fallback-2026-07-01',
       },
-      signal: AbortSignal.timeout(60000),
+      signal: AbortSignal.timeout(90000),
       body: JSON.stringify(b),
     });
   let res = await send({ ...body, fallbacks: 'default' });
