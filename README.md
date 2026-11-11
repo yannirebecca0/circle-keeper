@@ -41,8 +41,9 @@ Everything the agent does is recorded in an activity feed, so the organizer can 
 | **PayPal Payouts v1** | Send the pot to each round's recipient and check payout status. |
 | **PayPal Webhooks** | Signed `PAYMENT.CAPTURE.*` and `PAYMENT.PAYOUTS*` events, verified with `verify-webhook-signature`, update payments and payouts as they happen. |
 | **Google Gemini** (`gemini-3.8-flash` by default, free tier) **or Anthropic Claude** (`claude-sonnet-5-5`) | Rotation planning with validated JSON output, and the coordinator agent through function calling / tool use (`ai.js`, `agent.js`). Choose with `GEMINI_API_KEY` or `ANTHROPIC_API_KEY`. |
-| **Render** | Hosting through the included `render.yaml` blueprint. |
+| **Render** | (SPONSOR) Hosting through the included `render.yaml` blueprint. |
 | **Node.js 18+** | Zero npm dependencies: only Node built-ins and `fetch`. Plain HTML/JS frontend. |
+
 
 If no AI key is set, the app still works with rule-based fallbacks: sign-up order, template reminders, and a payout request when everyone has paid.
 
